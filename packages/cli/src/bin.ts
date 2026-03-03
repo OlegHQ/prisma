@@ -35,6 +35,7 @@ import { Generate } from './Generate'
 import { Init } from './Init'
 import { Mcp } from './mcp/MCP'
 import { Platform } from './platform/_Platform'
+import { Status } from './Status'
 import { Studio } from './Studio'
 /*
   When running bin.ts with ts-node with DEBUG="*"
@@ -47,6 +48,7 @@ import { Studio } from './Studio'
 // import { Studio } from './Studio'
 import { SubCommand } from './SubCommand'
 import { Telemetry } from './Telemetry'
+import { getLocalPrismaVersion, shouldWarnAboutGlobalInstallation } from './utils/check-global-installation'
 import { redactCommandArray } from './utils/checkpoint'
 import { loadOrInitializeCommandState } from './utils/commandState'
 import { loadConfig } from './utils/loadConfig'
@@ -88,50 +90,19 @@ const args = arg(
  * Main function
  */
 async function main(): Promise<number> {
+  if (shouldWarnAboutGlobalInstallation()) {
+    const localVersion = await getLocalPrismaVersion()
+    const versionInfo = localVersion ? ` (local version: ${localVersion})` : ''
+    console.warn(
+      `${yellow(bold('warn'))} You are running a global installation of Prisma CLI, but a local version is installed in your project's node_modules${versionInfo}. It is recommended to use the locally installed version by running it with npx, pnpm, or yarn.`,
+    )
+  }
+
   // create a new CLI with our subcommands
 
   const cli = CLI.new(
     {
       init: Init.new(),
-      platform: Platform.$.new({
-        workspace: Platform.Workspace.$.new({
-          show: Platform.Workspace.Show.new(),
-        }),
-        auth: Platform.Auth.$.new({
-          login: Platform.Auth.Login.new(),
-          logout: Platform.Auth.Logout.new(),
-          show: Platform.Auth.Show.new(),
-        }),
-        environment: Platform.Environment.$.new({
-          create: Platform.Environment.Create.new(),
-          delete: Platform.Environment.Delete.new(),
-          show: Platform.Environment.Show.new(),
-        }),
-        project: Platform.Project.$.new({
-          create: Platform.Project.Create.new(),
-          delete: Platform.Project.Delete.new(),
-          show: Platform.Project.Show.new(),
-        }),
-        pulse: Platform.Pulse.$.new({
-          enable: Platform.Pulse.Enable.new(),
-          disable: Platform.Pulse.Disable.new(),
-        }),
-        accelerate: Platform.Accelerate.$.new({
-          enable: Platform.Accelerate.Enable.new(),
-          disable: Platform.Accelerate.Disable.new(),
-        }),
-        serviceToken: Platform.ServiceToken.$.new({
-          create: Platform.ServiceToken.Create.new(),
-          delete: Platform.ServiceToken.Delete.new(),
-          show: Platform.ServiceToken.Show.new(),
-        }),
-        // Alias to "serviceToken". This will be removed in a future ORM release.
-        apikey: Platform.ServiceToken.$.new({
-          create: Platform.ServiceToken.Create.new(true),
-          delete: Platform.ServiceToken.Delete.new(true),
-          show: Platform.ServiceToken.Show.new(true),
-        }),
-      }),
       mcp: Mcp.new(),
       migrate: MigrateCommand.new({
         dev: MigrateDev.new(),
@@ -154,14 +125,9 @@ async function main(): Promise<number> {
       format: Format.new(),
       telemetry: Telemetry.new(),
       debug: DebugInfo.new(),
-      // TODO: add rules subcommand to --help after EA
-      rules: new SubCommand('@prisma/cli-security-rules'),
       dev: new SubCommand('@prisma/cli-dev'),
-      // TODO: add deploy subcommand to --help after it works.
-      deploy: new SubCommand('@prisma/cli-deploy'),
-      // TODO: add login subcommand to --help after it works.
-      login: new SubCommand('@prisma/cli-login'),
       studio: Studio.new(),
+      platform: Platform.$.new({ status: Status.new() }),
     },
     ['version', 'init', 'migrate', 'db', 'generate', 'validate', 'format', 'telemetry'],
     download,
